@@ -31,6 +31,9 @@ public class Anomalie {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "photo_url")
+    private String photoUrl;
+    
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
