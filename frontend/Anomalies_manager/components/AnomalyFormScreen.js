@@ -8,71 +8,77 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
-  Modal
+  Modal,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
 const AnomalyFormScreen = ({ navigation, route }) => {
   const { addAnomaly } = route.params;
   
-  const [title, setTitle] = useState('');
-  const [location, setLocation] = useState('');
-  const [severity, setSeverity] = useState('Moyenne');
-  const [assignee, setAssignee] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
-  
-  const severityOptions = [
-    { label: 'Critical', value: 'Critique' },
-    { label: 'Medium', value: 'Moyenne' },
-    { label: 'Low', value: 'Basse' }
+  // Mock backend data (replace with actual API calls)
+  const blocksFromBackend = [
+    { id: '1', name: 'Bloc A' },
+    { id: '2', name: 'Bloc B' },
+    { id: '3', name: 'Bloc C' }
   ];
-  
+
+  const machinesFromBackend = [
+    { id: '1', name: 'Machine 1', blocId: '1' },
+    { id: '2', name: 'Machine 2', blocId: '1' },
+    { id: '3', name: 'Machine 3', blocId: '2' }
+  ];
+
+  const [title, setTitle] = useState('');
+  const [selectedBloc, setSelectedBloc] = useState(null);
+  const [selectedMachine, setSelectedMachine] = useState(null);
+  const [description, setDescription] = useState('');
+  const [image, setImage] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalType, setModalType] = useState(null); // 'bloc' or 'machine'
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant camera roll permissions to add images');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+    }
+  };
+
   const handleSubmit = () => {
-    if (!title || !location || !assignee) {
+    if (!title || !selectedBloc || !selectedMachine || !description) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
-    
-    // Generate a random ID (in a real app, you'd get this from the backend)
-    const id = Math.random().toString(36).substring(2, 9);
-    
-    // Determine color based on severity
-    let color;
-    switch (severity) {
-      case 'Critique':
-        color = '#e74c3c';
-        break;
-      case 'Moyenne':
-        color = '#f39c12';
-        break;
-      default:
-        color = '#3498db';
-        break;
-    }
-    
-    // Create new anomaly object
+
     const newAnomaly = {
-      id,
+      id: Math.random().toString(36).substring(2, 9),
       title,
-      location,
-      severity,
-      assignee,
-      color,
+      blocId: selectedBloc.id,
+      blocName: selectedBloc.name,
+      machineId: selectedMachine.id,
+      machineName: selectedMachine.name,
+      description,
+      imageUri: image,
+      createdAt: new Date().toISOString(),
     };
-    
-    // Add the new anomaly to the list
+
     addAnomaly(newAnomaly);
-    
-    // Navigate back to home screen
     navigation.goBack();
   };
 
-  // Get the label for the current severity value
-  const getSeverityLabel = () => {
-    const option = severityOptions.find(option => option.value === severity);
-    return option ? option.label : '';
-  };
-  
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -82,7 +88,7 @@ const AnomalyFormScreen = ({ navigation, route }) => {
         <Text style={styles.title}>New Anomaly</Text>
         <View style={{ width: 24 }} />
       </View>
-      
+
       <ScrollView contentContainerStyle={styles.formContainer}>
         <Text style={styles.label}>Title *</Text>
         <TextInput
@@ -91,78 +97,116 @@ const AnomalyFormScreen = ({ navigation, route }) => {
           onChangeText={setTitle}
           placeholder="Enter anomaly title"
         />
-        
-        <Text style={styles.label}>Location *</Text>
-        <TextInput
-          style={styles.input}
-          value={location}
-          onChangeText={setLocation}
-          placeholder="Enter location (e.g. Zone A - Line 3)"
-        />
-        
-        <Text style={styles.label}>Severity</Text>
+
+        <Text style={styles.label}>Bloc *</Text>
         <TouchableOpacity
-          style={styles.dropdownButton}
-          onPress={() => setModalVisible(true)}
+          style={styles.dropdown}
+          onPress={() => {
+            setModalType('bloc');
+            setModalVisible(true);
+          }}
         >
-          <Text style={styles.dropdownButtonText}>{getSeverityLabel()}</Text>
+          <Text style={styles.dropdownText}>
+            {selectedBloc ? selectedBloc.name : 'Select Bloc'}
+          </Text>
           <Ionicons name="chevron-down" size={20} color="#666" />
         </TouchableOpacity>
-        
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}
+
+        <Text style={styles.label}>Machine *</Text>
+        <TouchableOpacity
+          style={[styles.dropdown, !selectedBloc && styles.dropdownDisabled]}
+          onPress={() => {
+            if (selectedBloc) {
+              setModalType('machine');
+              setModalVisible(true);
+            }
+          }}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Select Severity</Text>
-              
-              {severityOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={styles.optionItem}
-                  onPress={() => {
-                    setSeverity(option.value);
-                    setModalVisible(false);
-                  }}
-                >
-                  <Text style={[
-                    styles.optionText,
-                    severity === option.value && styles.selectedOptionText
-                  ]}>
-                    {option.label}
-                  </Text>
-                  {severity === option.value && (
-                    <Ionicons name="checkmark" size={20} color="#3498db" />
-                  )}
-                </TouchableOpacity>
-              ))}
-              
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-        
-        <Text style={styles.label}>Assignee Initials *</Text>
+          <Text style={styles.dropdownText}>
+            {selectedMachine ? selectedMachine.name : 'Select Machine'}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color="#666" />
+        </TouchableOpacity>
+
+        <Text style={styles.label}>Description *</Text>
         <TextInput
-          style={[styles.input, styles.shortInput]}
-          value={assignee}
-          onChangeText={setAssignee}
-          placeholder="e.g. MD"
-          maxLength={2}
+          style={[styles.input, styles.textArea]}
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Describe the anomaly"
+          multiline
+          numberOfLines={4}
         />
-        
+
+        <Text style={styles.label}>Photo</Text>
+        <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
+          {image ? (
+            <Image source={{ uri: image }} style={styles.selectedImage} />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <Ionicons name="camera" size={24} color="#666" />
+              <Text style={styles.imagePlaceholderText}>Add Photo</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
           <Text style={styles.submitButtonText}>Submit</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {modalType === 'bloc' ? 'Select Bloc' : 'Select Machine'}
+            </Text>
+
+            {modalType === 'bloc' ? (
+              blocksFromBackend.map((bloc) => (
+                <TouchableOpacity
+                  key={bloc.id}
+                  style={styles.optionItem}
+                  onPress={() => {
+                    setSelectedBloc(bloc);
+                    setSelectedMachine(null);
+                    setModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.optionText}>{bloc.name}</Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              machinesFromBackend
+                .filter((machine) => machine.blocId === selectedBloc?.id)
+                .map((machine) => (
+                  <TouchableOpacity
+                    key={machine.id}
+                    style={styles.optionItem}
+                    onPress={() => {
+                      setSelectedMachine(machine);
+                      setModalVisible(false);
+                    }}
+                  >
+                    <Text style={styles.optionText}>{machine.name}</Text>
+                  </TouchableOpacity>
+                ))
+            )}
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -290,6 +334,54 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+    paddingTop: 10,
+  },
+  dropdown: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    height: 50,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+  },
+  dropdownDisabled: {
+    backgroundColor: '#f5f5f5',
+    borderColor: '#e2e8f0',
+  },
+  dropdownText: {
+    fontSize: 16,
+    color: '#2c3e50',
+  },
+  imageButton: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  selectedImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  imagePlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePlaceholderText: {
+    marginTop: 8,
+    color: '#666',
+  }
 });
 
 export default AnomalyFormScreen;

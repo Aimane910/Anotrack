@@ -1,22 +1,53 @@
-import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
+import { AppRegistry, View } from 'react-native';
+import { SetStateAction, useState } from 'react';
 import LoginScreen from '../Screen/LoginScreen';
 import HomeScreen from '../Screen/HomeScreen';
 import AnomalyFormScreen from '../components/AnomalyFormScreen';
-import AccountScreen from '../Screen/AccountScreen';
+import appJson from '../app.json';
 
-const Stack = createStackNavigator();
+function App() {
+  const [currentScreen, setCurrentScreen] = useState('Login');
+  const [userData, setUserData] = useState(null);
 
-const AppNavigator = () => {
+  const navigate = (screen: string, params: SetStateAction<null>) => {
+    const screenName = screen === 'HomeScreen' ? 'Home' : 
+                      screen === 'LoginScreen' ? 'Login' :
+                      screen === 'AnomalyForm' ? 'AnomalyForm' :
+                      screen;
+                      
+    setCurrentScreen(screenName);
+    if (params) {
+      setUserData(params);
+    }
+  };
+
+  const goBack = () => {
+    setCurrentScreen('Home'); // Default back navigation to Home
+  };
+
   return (
-    <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="AnomalyForm" component={AnomalyFormScreen} />
-      <Stack.Screen name="Account" component={AccountScreen} />
-      
-    </Stack.Navigator>
+    <View style={{ flex: 1 }}>
+      {currentScreen === 'Login' && (
+        <LoginScreen 
+          navigation={{ navigate, goBack }} 
+        />
+      )}
+      {currentScreen === 'Home' && (
+        <HomeScreen 
+          navigation={{ navigate, goBack }} 
+          route={{ params: userData }}
+        />
+      )}
+      {currentScreen === 'AnomalyForm' && (
+        <AnomalyFormScreen
+          navigation={{ navigate, goBack }}
+          route={{ params: userData }}
+        />
+      )}
+    </View>
   );
-};
+}
 
-export default AppNavigator;
+AppRegistry.registerComponent(appJson.expo.name, () => App);
+
+export default App;
