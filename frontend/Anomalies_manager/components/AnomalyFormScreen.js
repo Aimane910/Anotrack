@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   View,
   Text,
@@ -14,21 +15,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
+const API_URL = 'http://your-backend-url/api'; // Replace with your actual API URL
+
 const AnomalyFormScreen = ({ navigation, route }) => {
   const { addAnomaly } = route.params;
   
-  // Mock backend data (replace with actual API calls)
-  const blocksFromBackend = [
-    { id: '1', name: 'Bloc A' },
-    { id: '2', name: 'Bloc B' },
-    { id: '3', name: 'Bloc C' }
-  ];
-
-  const machinesFromBackend = [
-    { id: '1', name: 'Machine 1', blocId: '1' },
-    { id: '2', name: 'Machine 2', blocId: '1' },
-    { id: '3', name: 'Machine 3', blocId: '2' }
-  ];
+  // Replace mock data with state
+  const [blocks, setBlocks] = useState([]);
+  const [machines, setMachines] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [title, setTitle] = useState('');
   const [selectedBloc, setSelectedBloc] = useState(null);
@@ -37,6 +32,33 @@ const AnomalyFormScreen = ({ navigation, route }) => {
   const [image, setImage] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState(null); // 'bloc' or 'machine'
+
+  // Fetch blocks and machines from backend
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [blocksResponse, machinesResponse] = await Promise.all([
+          axios.get(`${API_URL}/blocs`),
+          axios.get(`${API_URL}/machines`)
+        ]);
+
+        if (blocksResponse.data.success) {
+          setBlocks(blocksResponse.data.blocs);
+        }
+
+        if (machinesResponse.data.success) {
+          setMachines(machinesResponse.data.machines);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        Alert.alert('Error', 'Failed to load blocs and machines');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -77,6 +99,12 @@ const AnomalyFormScreen = ({ navigation, route }) => {
 
     addAnomaly(newAnomaly);
     navigation.goBack();
+  };
+
+  // Filter machines by selected bloc
+  const getFilteredMachines = () => {
+    if (!selectedBloc) return [];
+    return machines.filter(machine => machine.blocId === selectedBloc.id);
   };
 
   return (
@@ -167,8 +195,10 @@ const AnomalyFormScreen = ({ navigation, route }) => {
               {modalType === 'bloc' ? 'Select Bloc' : 'Select Machine'}
             </Text>
 
-            {modalType === 'bloc' ? (
-              blocksFromBackend.map((bloc) => (
+            {isLoading ? (
+              <Text>Loading...</Text>
+            ) : modalType === 'bloc' ? (
+              blocks.map((bloc) => (
                 <TouchableOpacity
                   key={bloc.id}
                   style={styles.optionItem}
@@ -182,20 +212,18 @@ const AnomalyFormScreen = ({ navigation, route }) => {
                 </TouchableOpacity>
               ))
             ) : (
-              machinesFromBackend
-                .filter((machine) => machine.blocId === selectedBloc?.id)
-                .map((machine) => (
-                  <TouchableOpacity
-                    key={machine.id}
-                    style={styles.optionItem}
-                    onPress={() => {
-                      setSelectedMachine(machine);
-                      setModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.optionText}>{machine.name}</Text>
-                  </TouchableOpacity>
-                ))
+              getFilteredMachines().map((machine) => (
+                <TouchableOpacity
+                  key={machine.id}
+                  style={styles.optionItem}
+                  onPress={() => {
+                    setSelectedMachine(machine);
+                    setModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.optionText}>{machine.name}</Text>
+                </TouchableOpacity>
+              ))
             )}
 
             <TouchableOpacity

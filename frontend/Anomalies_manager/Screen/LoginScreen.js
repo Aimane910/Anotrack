@@ -32,9 +32,17 @@ const LoginScreen = ({ navigation }) => {
     try {
       // First check for admin credentials
       if (username === 'admin' && password === 'admin') {
-        navigation.navigate('Home', {
+        navigation.navigate('AdminScreen', {
           username: 'admin',
           userData: { role: 'admin' }
+        });
+        return;
+      }
+
+      if (username === 'user' && password === 'user') {
+        navigation.navigate('HomeScreen', {
+          username: 'user',
+          userData: { role: 'user' }
         });
         return;
       }
@@ -50,10 +58,18 @@ const LoginScreen = ({ navigation }) => {
       });
 
       if (response.data.success) {
-        navigation.navigate('Home', {
-          username: response.data.username,
-          userData: response.data.userData
-        });
+        // Check user role and navigate accordingly
+        if (response.data.userData.role === 'admin') {
+          navigation.navigate('AdminScreen', {
+            username: response.data.username,
+            userData: response.data.userData
+          });
+        } else {
+          navigation.navigate('Home', {
+            username: response.data.username,
+            userData: response.data.userData
+          });
+        }
       } else {
         Alert.alert('Error', response.data.message || 'Invalid credentials');
       }
@@ -124,11 +140,6 @@ const LoginScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Forgot Password Link */}
-        <TouchableOpacity style={styles.forgotPassword}>
-          <Text style={styles.forgotPasswordText}>Forgot password?</Text>
-        </TouchableOpacity>
-
         {/* Login Button */}
         <TouchableOpacity 
           style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
@@ -141,13 +152,7 @@ const LoginScreen = ({ navigation }) => {
           </Text>
         </TouchableOpacity>
 
-        {/* Help Section */}
-        <View style={styles.helpSection}>
-          <Text style={styles.helpText}>Need help? </Text>
-          <TouchableOpacity>
-            <Text style={styles.contactText}>Contact Support</Text>
-          </TouchableOpacity>
-        </View>
+        
       </View>
     </SafeAreaView>
   );
@@ -227,16 +232,6 @@ const styles = StyleSheet.create({
   },
   eyeIcon: {
     padding: 8,
-  },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  forgotPasswordText: {
-    color: '#3B82F6',
-    fontSize: 14,
-    fontWeight: '600',
   },
   loginButton: {
     width: '100%',

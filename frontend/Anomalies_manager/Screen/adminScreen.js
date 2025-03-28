@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { 
   StyleSheet, 
   Text, 
@@ -13,7 +14,9 @@ import {
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 
-export default function App() {
+const API_URL = 'http://your-backend-url/api'; // Replace with your actual API URL
+
+const AdminScreen = ({ navigation, route }) => {
   // States for form inputs
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -27,41 +30,99 @@ export default function App() {
   const [blocs, setBlocs] = useState([]);
   const [machines, setMachines] = useState([]);
 
-  // Add employee function
-  const addEmployee = () => {
+  // Add employee function with axios
+  const addEmployee = async () => {
     if (username && password && role) {
-      setEmployees([...employees, { username, password, role }]);
-      setUsername('');
-      setPassword('');
-      setRole('worker');
-      alert('Employee added successfully!');
+      try {
+        const response = await axios.post(`${API_URL}/employees`, {
+          username,
+          password,
+          role
+        });
+
+        if (response.data.success) {
+          setEmployees([...employees, response.data.employee]);
+          setUsername('');
+          setPassword('');
+          setRole('worker');
+          alert('Employee added successfully!');
+        }
+      } catch (error) {
+        console.error('Error adding employee:', error);
+        alert(error.response?.data?.message || 'Error adding employee');
+      }
     } else {
       alert('Please fill all employee fields!');
     }
   };
 
-  // Add bloc function
-  const addBloc = () => {
+  // Add bloc function with axios
+  const addBloc = async () => {
     if (blocName) {
-      setBlocs([...blocs, { name: blocName }]);
-      setBlocName('');
-      alert('Bloc added successfully!');
+      try {
+        const response = await axios.post(`${API_URL}/blocs`, {
+          name: blocName
+        });
+
+        if (response.data.success) {
+          setBlocs([...blocs, response.data.bloc]);
+          setBlocName('');
+          alert('Bloc added successfully!');
+        }
+      } catch (error) {
+        console.error('Error adding bloc:', error);
+        alert(error.response?.data?.message || 'Error adding bloc');
+      }
     } else {
       alert('Please enter bloc name!');
     }
   };
 
-  // Add machine function
-  const addMachine = () => {
+  // Add machine function with axios
+  const addMachine = async () => {
     if (machineName && selectedBloc) {
-      setMachines([...machines, { name: machineName, bloc: selectedBloc }]);
-      setMachineName('');
-      setSelectedBloc('');
-      alert('Machine added successfully!');
+      try {
+        const response = await axios.post(`${API_URL}/machines`, {
+          name: machineName,
+          blocId: selectedBloc
+        });
+
+        if (response.data.success) {
+          setMachines([...machines, response.data.machine]);
+          setMachineName('');
+          setSelectedBloc('');
+          alert('Machine added successfully!');
+        }
+      } catch (error) {
+        console.error('Error adding machine:', error);
+        alert(error.response?.data?.message || 'Error adding machine');
+      }
     } else {
       alert('Please fill all machine fields!');
     }
   };
+
+  // Fetch initial data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [employeesRes, blocsRes, machinesRes] = await Promise.all([
+          axios.get(`${API_URL}/employees`),
+          axios.get(`${API_URL}/blocs`),
+          axios.get(`${API_URL}/machines`)
+        ]);
+
+        setEmployees(employeesRes.data.employees);
+        setBlocs(blocsRes.data.blocs);
+        setMachines(machinesRes.data.machines);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        alert('Error loading initial data');
+      }
+    };
+
+    fetchData();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -156,7 +217,7 @@ export default function App() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -235,3 +296,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
+export default AdminScreen;

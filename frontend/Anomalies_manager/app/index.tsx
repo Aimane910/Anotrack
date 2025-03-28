@@ -1,17 +1,19 @@
 import { AppRegistry, View } from 'react-native';
-import { SetStateAction, useState } from 'react';
+import { useState } from 'react';
 import LoginScreen from '../Screen/LoginScreen';
 import HomeScreen from '../Screen/HomeScreen';
+import AdminScreen from '../Screen/adminScreen';
 import AnomalyFormScreen from '../components/AnomalyFormScreen';
 import appJson from '../app.json';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState('Login');
-  const [userData, setUserData] = useState(null);
+  const [userData, setUserData] = useState<any>(null);
 
-  const navigate = (screen: string, params: SetStateAction<null>) => {
+  const navigate = (screen: string, params?: any) => {
     const screenName = screen === 'HomeScreen' ? 'Home' : 
                       screen === 'LoginScreen' ? 'Login' :
+                      screen === 'AdminScreen' ? 'AdminScreen' :
                       screen === 'AnomalyForm' ? 'AnomalyForm' :
                       screen;
                       
@@ -22,7 +24,7 @@ function App() {
   };
 
   const goBack = () => {
-    setCurrentScreen('Home'); // Default back navigation to Home
+    setCurrentScreen('Home');
   };
 
   return (
@@ -35,6 +37,12 @@ function App() {
       {currentScreen === 'Home' && (
         <HomeScreen 
           navigation={{ navigate, goBack }} 
+          route={{ params: userData }}
+        />
+      )}
+      {currentScreen === 'AdminScreen' && (
+        <AdminScreen 
+          navigation={{ navigate, goBack }}
           route={{ params: userData }}
         />
       )}
