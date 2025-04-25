@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 @Entity
+@Table(name = "role_entity")
 @Data
 public class RoleEntity {
     @Id
@@ -11,13 +12,13 @@ public class RoleEntity {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 20)
+    @Column(length = 20, nullable = false)
     private ERole name;
+
     public RoleEntity(ERole name) {
         this.name = name;
     }
 
     public RoleEntity() {
-
     }
 }

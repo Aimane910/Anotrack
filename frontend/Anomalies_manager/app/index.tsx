@@ -11,13 +11,14 @@ function App() {
   const [userData, setUserData] = useState<any>(null);
 
   const navigate = (screen: string, params?: any) => {
-    const screenName = screen === 'HomeScreen' ? 'Home' : 
-                      screen === 'LoginScreen' ? 'Login' :
-                      screen === 'AdminScreen' ? 'AdminScreen' :
-                      screen === 'AnomalyForm' ? 'AnomalyForm' :
-                      screen;
-                      
-    setCurrentScreen(screenName);
+    console.log('Navigation requested:', { screen, params }); // Debug log
+    setCurrentScreen(
+      screen === 'HomeScreen' ? 'Home' : 
+      screen === 'LoginScreen' ? 'Login' :
+      screen === 'AdminScreen' ? 'Admin' :
+      screen === 'AnomalyForm' ? 'AnomalyForm' :
+      screen
+    );
     if (params) {
       setUserData(params);
     }
@@ -26,6 +27,7 @@ function App() {
   const goBack = () => {
     setCurrentScreen('Home');
   };
+
 
   return (
     <View style={{ flex: 1 }}>
@@ -40,7 +42,7 @@ function App() {
           route={{ params: userData }}
         />
       )}
-      {currentScreen === 'AdminScreen' && (
+      {currentScreen === 'Admin' && (
         <AdminScreen 
           navigation={{ navigate, goBack }}
           route={{ params: userData }}

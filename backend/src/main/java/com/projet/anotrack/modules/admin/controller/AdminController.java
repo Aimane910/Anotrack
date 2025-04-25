@@ -12,10 +12,10 @@ import com.projet.anotrack.modules.utilisateur.domain.Utilisateur;
 import com.projet.anotrack.modules.utilisateur.domain.RoleEntity;
 import com.projet.anotrack.modules.utilisateur.domain.ERole;
 import com.projet.anotrack.modules.bloc.domain.Bloc;
-import com.projet.anotrack.modules.bloc.domain.Machine;
-import org.springframework.data.repository.CrudRepository;
+
 import com.projet.anotrack.modules.bloc.repository.BlocRepository;
-import com.projet.anotrack.modules.bloc.repository.MachineRepository;
+import com.projet.anotrack.modules.Machine.domain.Machine;
+import com.projet.anotrack.modules.Machine.repository.MachineRepository;
 import com.projet.anotrack.modules.admin.dto.CreateUserRequest;
 
 import java.util.HashSet;
@@ -87,16 +87,68 @@ public class AdminController {
         }
     }
 
-    @PostMapping("/blocs/{blocId}/machines")
-    public ResponseEntity<?> addMachine(@PathVariable Long blocId, @RequestBody Machine machine) {
+    @PostMapping("/admin/blocs/machines")
+    public ResponseEntity<Machine> addMachine(@RequestParam Long blocId, @RequestBody Machine machine) {
         return blocRepository.findById(blocId)
             .map(bloc -> {
                 machine.setBloc(bloc);
                 Machine savedMachine = machineRepository.save(machine);
                 return ResponseEntity.ok(savedMachine);
-            })
-            .orElse(ResponseEntity
-                .badRequest()
-                .body("Error: Bloc not found!"));
+        })
+        .orElseGet(() -> ResponseEntity.badRequest().build());
+}
+
+    @GetMapping("/blocs")
+    public ResponseEntity<?> getAllBlocs() {
+        return ResponseEntity.ok(blocRepository.findAll());
+    }
+
+    @GetMapping("/blocs/{blocId}")
+    public ResponseEntity<?> getBlocById(@PathVariable Long blocId) {
+        return blocRepository.findById(blocId)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/blocs/{blocId}/machines")
+    public ResponseEntity<?> getMachinesByBloc(@PathVariable Long blocId) {
+        return blocRepository.findById(blocId)
+            .map(bloc -> ResponseEntity.ok(machineRepository.findByBloc(bloc)))
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/machines")
+    public ResponseEntity<?> getAllMachines() {
+        return ResponseEntity.ok(machineRepository.findAll());
+    }
+
+    @GetMapping("/machines/{machineId}")
+    public ResponseEntity<?> getMachineById(@PathVariable Long machineId) {
+        return machineRepository.findById(machineId)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/users")
+    public ResponseEntity<?> getAllUsers() {
+        return ResponseEntity.ok(userRepository.findAll());
+    }
+
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<?> getUserById(@PathVariable Long userId) {
+        return userRepository.findById(userId)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/users/role/{role}")
+    public ResponseEntity<?> getUsersByRole(@PathVariable String role) {
+        try {
+            ERole roleEnum = ERole.valueOf("ROLE_" + role.toUpperCase());
+            Set<Utilisateur> users = userRepository.findByRolesName(roleEnum);
+            return ResponseEntity.ok(users);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body("Invalid role specified");
+        }
     }
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -15,15 +16,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-const API_URL = 'http://your-backend-url/api'; // Replace with your actual API URL
+const API_URL = 'http://localhost:8080/api'; // Replace with your actual backend IP
 
 const AnomalyFormScreen = ({ navigation, route }) => {
   const { addAnomaly } = route.params;
   
-  // Replace mock data with state
   const [blocks, setBlocks] = useState([]);
   const [machines, setMachines] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [token, setToken] = useState(null);
 
   const [title, setTitle] = useState('');
   const [selectedBloc, setSelectedBloc] = useState(null);
@@ -33,32 +34,94 @@ const AnomalyFormScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState(null); // 'bloc' or 'machine'
 
-  // Fetch blocks and machines from backend
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [blocksResponse, machinesResponse] = await Promise.all([
-          axios.get(`${API_URL}/blocs`),
-          axios.get(`${API_URL}/machines`)
-        ]);
+  const getToken = async () => {
+    try {
+      const userToken = await AsyncStorage.getItem('userToken');
+      if (!userToken) {
+        console.log('No token found');
+        navigation.navigate('Login');
+        return null;
+      }
+      setToken(userToken);
+      return userToken;
+    } catch (error) {
+      console.error('Error getting token:', error);
+      return null;
+    }
+  };
 
-        if (blocksResponse.data.success) {
-          setBlocks(blocksResponse.data.blocs);
+  useEffect(() => {
+    const fetchBlocs = async () => {
+      try {
+        const userToken = await getToken();
+        if (!userToken) {
+          console.log('No token available');
+          navigation.navigate('Login');
+          return;
         }
 
-        if (machinesResponse.data.success) {
-          setMachines(machinesResponse.data.machines);
+        const config = {
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+            'Content-Type': 'application/json'
+          }
+        };
+
+        const blocsResponse = await axios.get(`${API_URL}/blocs`, config);
+        console.log('Blocs response:', blocsResponse.data);
+
+        if (Array.isArray(blocsResponse.data)) {
+          setBlocks(blocsResponse.data);
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
-        Alert.alert('Error', 'Failed to load blocs and machines');
+        console.error('Error fetching blocs:', error);
+        if (error.response?.status === 401) {
+          Alert.alert('Session Expired', 'Please login again');
+          navigation.navigate('Login');
+        } else {
+          Alert.alert('Error', 'Failed to load blocs');
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchData();
+    fetchBlocs();
   }, []);
+
+  useEffect(() => {
+    const fetchMachinesByBloc = async () => {
+      if (!selectedBloc) return;
+
+      try {
+        const userToken = await getToken();
+        if (!userToken) return;
+
+        const config = {
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+            'Content-Type': 'application/json'
+          }
+        };
+
+        const machinesResponse = await axios.get(
+          `${API_URL}/blocs/${selectedBloc.id}/machines`,
+          config
+        );
+        
+        console.log('Machines for bloc:', machinesResponse.data);
+
+        if (Array.isArray(machinesResponse.data)) {
+          setMachines(machinesResponse.data);
+        }
+      } catch (error) {
+        console.error('Error fetching machines:', error);
+        Alert.alert('Error', 'Failed to load machines for this bloc');
+      }
+    };
+
+    fetchMachinesByBloc();
+  }, [selectedBloc]); // This will run whenever selectedBloc changes
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -79,32 +142,103 @@ const AnomalyFormScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title || !selectedBloc || !selectedMachine || !description) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
-    const newAnomaly = {
-      id: Math.random().toString(36).substring(2, 9),
-      title,
-      blocId: selectedBloc.id,
-      blocName: selectedBloc.name,
-      machineId: selectedMachine.id,
-      machineName: selectedMachine.name,
-      description,
-      imageUri: image,
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      const userToken = await getToken();
+      if (!userToken) {
+        Alert.alert('Error', 'Authentication required');
+        return;
+      }
 
-    addAnomaly(newAnomaly);
-    navigation.goBack();
+      // First, log what we're about to send
+      console.log('Preparing to submit anomaly with:', {
+        title,
+        description,
+        machineId: selectedMachine.id,
+        image: image ? 'Present' : 'Not present'
+      });
+
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('machineId', selectedMachine.id.toString()); // Convert to string
+
+      if (image) {
+        // Get file extension from URI
+        const fileExtension = image.split('.').pop();
+        const fileName = `anomaly_${Date.now()}.${fileExtension}`;
+
+        formData.append('photo', {
+          uri: Platform.OS === 'ios' ? image.replace('file://', '') : image,
+          type: 'image/jpeg',
+          name: fileName
+        });
+      }
+
+      console.log('FormData prepared:', Object.fromEntries(formData._parts));
+
+      const response = await axios.post(
+        `${API_URL}/anomalies/create`,
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+            'Content-Type': 'multipart/form-data',
+            'Accept': 'application/json'
+          },
+          // Add timeout and validate status
+          timeout: 10000,
+          validateStatus: status => status >= 200 && status < 300
+        }
+      );
+
+      console.log('Server response:', {
+        status: response.status,
+        data: response.data
+      });
+
+      if (response.status === 200 || response.status === 201) {
+        Alert.alert('Success', 'Anomaly reported successfully');
+        // Clear form
+        setTitle('');
+        setDescription('');
+        setSelectedBloc(null);
+        setSelectedMachine(null);
+        setImage(null);
+        navigation.goBack();
+      }
+    } catch (error) {
+      console.error('Submission error details:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        config: error.config
+      });
+
+      let errorMessage = 'Failed to submit anomaly';
+      if (error.response) {
+        if (error.response.status === 401) {
+          errorMessage = 'Session expired. Please login again.';
+          navigation.navigate('Login');
+        } else {
+          errorMessage = error.response.data?.message || errorMessage;
+        }
+      } else if (error.request) {
+        errorMessage = 'Network error. Please check your connection.';
+      }
+
+      Alert.alert('Error', errorMessage);
+    }
   };
 
-  // Filter machines by selected bloc
   const getFilteredMachines = () => {
-    if (!selectedBloc) return [];
-    return machines.filter(machine => machine.blocId === selectedBloc.id);
+    // No need to filter since machines are already specific to the bloc
+    return machines;
   };
 
   return (
@@ -211,19 +345,25 @@ const AnomalyFormScreen = ({ navigation, route }) => {
                   <Text style={styles.optionText}>{bloc.name}</Text>
                 </TouchableOpacity>
               ))
-            ) : (
-              getFilteredMachines().map((machine) => (
-                <TouchableOpacity
-                  key={machine.id}
-                  style={styles.optionItem}
-                  onPress={() => {
-                    setSelectedMachine(machine);
-                    setModalVisible(false);
-                  }}
-                >
-                  <Text style={styles.optionText}>{machine.name}</Text>
-                </TouchableOpacity>
-              ))
+            ) : modalType === 'machine' && selectedBloc && (
+              <View>
+                {getFilteredMachines().length > 0 ? (
+                  getFilteredMachines().map((machine) => (
+                    <TouchableOpacity
+                      key={machine.id}
+                      style={styles.optionItem}
+                      onPress={() => {
+                        setSelectedMachine(machine);
+                        setModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.optionText}>{machine.name}</Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={styles.noDataText}>No machines found for this bloc</Text>
+                )}
+              </View>
             )}
 
             <TouchableOpacity
@@ -409,6 +549,12 @@ const styles = StyleSheet.create({
   imagePlaceholderText: {
     marginTop: 8,
     color: '#666',
+  },
+  noDataText: {
+    textAlign: 'center',
+    color: '#666',
+    marginVertical: 20,
+    fontSize: 16
   }
 });
 

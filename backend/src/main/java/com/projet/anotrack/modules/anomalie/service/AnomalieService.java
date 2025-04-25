@@ -7,6 +7,7 @@ import com.projet.anotrack.modules.anomalie.domain.EStatus;
 import com.projet.anotrack.modules.anomalie.repository.AnomalieRepository;
 import com.projet.anotrack.modules.utilisateur.domain.Utilisateur;
 
+import org.apache.velocity.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,8 +21,9 @@ import java.util.List;
 public class AnomalieService {
     private final AnomalieRepository anomalieRepository;
     private final MachineRepository machineRepository;
-    public AnomalieService(AnomalieRepository anomalieRepository) {
+    public AnomalieService(AnomalieRepository anomalieRepository, MachineRepository machineRepository) {
         this.anomalieRepository = anomalieRepository;
+        this.machineRepository = machineRepository;
     }
 
     public List<Anomalie> getAllUnassignedAnomalies() {

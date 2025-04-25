@@ -12,16 +12,17 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
-const API_URL = 'http://your-backend-url/api'; // Replace with your actual API URL
+const API_URL = 'http://localhost:8080/api/auth'; // Update with your actual IP
 
 const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const handleLogin = async () => {
     if (!username || !password) {
       Alert.alert('Error', 'Please enter both username and password');
@@ -30,54 +31,56 @@ const LoginScreen = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      // First check for admin credentials
-      if (username === 'admin' && password === 'admin') {
-        navigation.navigate('AdminScreen', {
-          username: 'admin',
-          userData: { role: 'admin' }
-        });
-        return;
-      }
+      console.log('Login attempt:', { username });
 
-      if (username === 'user' && password === 'user') {
-        navigation.navigate('HomeScreen', {
-          username: 'user',
-          userData: { role: 'user' }
-        });
-        return;
-      }
-
-      // If not admin, try backend authentication
-      const response = await axios.post(`${API_URL}/login`, {
-        username,
-        password
+      const response = await axios.post(`${API_URL}/signin`, {
+        username: username.trim(),
+        password: password.trim()
       }, {
         headers: {
           'Content-Type': 'application/json'
         }
       });
 
-      if (response.data.success) {
-        // Check user role and navigate accordingly
-        if (response.data.userData.role === 'admin') {
-          navigation.navigate('AdminScreen', {
-            username: response.data.username,
-            userData: response.data.userData
-          });
+      console.log('Server response:', response.data);
+
+      if (response.data && response.data.token) {
+        // Store authentication data
+        await AsyncStorage.setItem('userToken', response.data.token);
+        
+        const userData = {
+          id: response.data.id,
+          username: response.data.username,
+          roles: response.data.roles,
+          token: response.data.token
+        };
+
+        await AsyncStorage.setItem('userData', JSON.stringify(userData));
+
+        console.log('User roles:', response.data.roles);
+
+        if (response.data.roles.includes('ROLE_ADMIN')) {
+          console.log('Navigating to Admin screen');
+          navigation.navigate('AdminScreen', { userData });
         } else {
-          navigation.navigate('Home', {
-            username: response.data.username,
-            userData: response.data.userData
-          });
+          console.log('Navigating to Home screen');
+          navigation.navigate('HomeScreen', { userData });
         }
+
+        // Clear form
+        setUsername('');
+        setPassword('');
       } else {
-        Alert.alert('Error', response.data.message || 'Invalid credentials');
+        Alert.alert('Error', 'Invalid server response');
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Login error:', {
+        message: error.message,
+        response: error.response?.data
+      });
       Alert.alert(
         'Login Error',
-        error.response?.data?.message || 'An error occurred while logging in'
+        error.response?.data?.message || 'Connection failed. Please try again.'
       );
     } finally {
       setIsLoading(false);
@@ -151,8 +154,6 @@ const LoginScreen = ({ navigation }) => {
             {isLoading ? 'Signing in...' : 'Sign In'}
           </Text>
         </TouchableOpacity>
-
-        
       </View>
     </SafeAreaView>
   );

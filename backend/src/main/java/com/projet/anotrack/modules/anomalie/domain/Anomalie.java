@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 
+import com.projet.anotrack.modules.Machine.domain.Machine;
 import com.projet.anotrack.modules.utilisateur.domain.Utilisateur;
 import lombok.Getter;
 import lombok.Setter;
@@ -36,6 +37,10 @@ public class Anomalie {
     
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "machine_id", nullable = false)
+    private Machine machine;
 
     @Getter
     @ManyToOne(fetch = FetchType.LAZY)

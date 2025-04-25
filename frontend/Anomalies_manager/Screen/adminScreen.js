@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   StyleSheet, 
   Text, 
@@ -10,11 +11,12 @@ import {
   ScrollView, 
   KeyboardAvoidingView, 
   Platform,
-  Image
+  Image,
+  Alert
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 
-const API_URL = 'http://your-backend-url/api'; // Replace with your actual API URL
+const API_URL = 'http://localhost:8080/api'; // Replace with your actual API URL
 
 const AdminScreen = ({ navigation, route }) => {
   // States for form inputs
@@ -24,81 +26,129 @@ const AdminScreen = ({ navigation, route }) => {
   const [blocName, setBlocName] = useState('');
   const [machineName, setMachineName] = useState('');
   const [selectedBloc, setSelectedBloc] = useState('');
+  const [token, setToken] = useState(null);
+  const [blocIdMapping, setBlocIdMapping] = useState({});
 
   // Demo data
   const [employees, setEmployees] = useState([]);
   const [blocs, setBlocs] = useState([]);
   const [machines, setMachines] = useState([]);
 
+  // Function to get token
+  const getToken = async () => {
+    try {
+      const userToken = await AsyncStorage.getItem('userToken');
+      setToken(userToken);
+      return userToken;
+    } catch (error) {
+      console.error('Error getting token:', error);
+      return null;
+    }
+  };
+
   // Add employee function with axios
   const addEmployee = async () => {
-    if (username && password && role) {
-      try {
-        const response = await axios.post(`${API_URL}/employees`, {
+    if (!username || !password || !role) {
+      Alert.alert('Error', 'Please fill all employee fields!');
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/auth/signup`, // Adjust the endpoint as per your API
+        {
           username,
           password,
-          role
-        });
-
-        if (response.data.success) {
-          setEmployees([...employees, response.data.employee]);
-          setUsername('');
-          setPassword('');
-          setRole('worker');
-          alert('Employee added successfully!');
+          role: [role],
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         }
-      } catch (error) {
-        console.error('Error adding employee:', error);
-        alert(error.response?.data?.message || 'Error adding employee');
+      );
+
+      if (response.data.success) {
+        setEmployees([...employees, response.data.employee]);
+        setUsername('');
+        setPassword('');
+        setRole('worker');
+        Alert.alert('Success', 'Employee added successfully!');
       }
-    } else {
-      alert('Please fill all employee fields!');
+    } catch (error) {
+      console.error('Error adding employee:', error);
+      Alert.alert('Error', error.response?.data?.message || 'Error adding employee');
     }
   };
 
   // Add bloc function with axios
   const addBloc = async () => {
-    if (blocName) {
-      try {
-        const response = await axios.post(`${API_URL}/blocs`, {
-          name: blocName
-        });
+    if (!blocName) {
+      Alert.alert('Error', 'Please enter bloc name!');
+      return;
+    }
 
-        if (response.data.success) {
-          setBlocs([...blocs, response.data.bloc]);
-          setBlocName('');
-          alert('Bloc added successfully!');
+    try {
+      const response = await axios.post(
+        `${API_URL}/admin/blocs`,
+        { name: blocName },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         }
-      } catch (error) {
-        console.error('Error adding bloc:', error);
-        alert(error.response?.data?.message || 'Error adding bloc');
+      );
+
+      if (response.data.success) {
+        setBlocs([...blocs, response.data.bloc]);
+        setBlocName('');
+        Alert.alert('Success', 'Bloc added successfully!');
       }
-    } else {
-      alert('Please enter bloc name!');
+    } catch (error) {
+      console.error('Error adding bloc:', error);
+      Alert.alert('Error', error.response?.data?.message || 'Error adding bloc');
     }
   };
 
   // Add machine function with axios
   const addMachine = async () => {
-    if (machineName && selectedBloc) {
-      try {
-        const response = await axios.post(`${API_URL}/machines`, {
-          name: machineName,
-          blocId: selectedBloc
-        });
+    if (!machineName || !selectedBloc) {
+      Alert.alert('Error', 'Please select a bloc and enter a machine name!');
+      return;
+    }
 
-        if (response.data.success) {
-          setMachines([...machines, response.data.machine]);
-          setMachineName('');
-          setSelectedBloc('');
-          alert('Machine added successfully!');
+    try {
+      // selectedBloc is already the ID, no need for mapping
+      const response = await axios.post(
+        `${API_URL}/admin/blocs/machines?blocId=${selectedBloc}`,
+        { 
+          name: machineName,
+          description: ' '
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         }
-      } catch (error) {
-        console.error('Error adding machine:', error);
-        alert(error.response?.data?.message || 'Error adding machine');
+      );
+
+      console.log('Adding machine to bloc:', {
+        blocId: selectedBloc,
+        machineName: machineName
+      });
+    
+      if (response.status === 200) {
+        setMachines([...machines, response.data]);
+        setMachineName('');
+        setSelectedBloc('');
+        Alert.alert('Success', 'Machine added successfully!');
       }
-    } else {
-      alert('Please fill all machine fields!');
+    } catch (error) {
+      console.error('Error adding machine:', error);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to add machine');
     }
   };
 
@@ -106,22 +156,45 @@ const AdminScreen = ({ navigation, route }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [employeesRes, blocsRes, machinesRes] = await Promise.all([
-          axios.get(`${API_URL}/employees`),
-          axios.get(`${API_URL}/blocs`),
-          axios.get(`${API_URL}/machines`)
-        ]);
+        const userToken = await getToken();
+        if (!userToken) {
+          Alert.alert('Error', 'No authentication token found');
+          navigation.navigate('Login');
+          return;
+        }
 
-        setEmployees(employeesRes.data.employees);
-        setBlocs(blocsRes.data.blocs);
-        setMachines(machinesRes.data.machines);
+        const config = {
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+            'Content-Type': 'application/json'
+          }
+        };
+
+        // Add debug log for blocs response
+        const blocsRes = await axios.get(`${API_URL}/admin/blocs`, config);
+        console.log('Blocs response:', blocsRes.data);
+
+        setBlocs(blocsRes.data);
+        
+        // Create bloc ID mapping
+        const mapping = {};
+        blocsRes.data.forEach(bloc => {
+          mapping[bloc.name] = bloc.id;
+        });
+        setBlocIdMapping(mapping);
+        console.log('Bloc ID mapping created:', mapping);
+
       } catch (error) {
-        console.error('Error fetching data:', error);
-        alert('Error loading initial data');
+        console.error('Error fetching blocs:', error);
+        Alert.alert('Error', 'Failed to load blocs');
       }
     };
 
     fetchData();
+  }, []);
+
+  useEffect(() => {
+    getToken();
   }, []);
 
   return (
@@ -163,9 +236,8 @@ const AdminScreen = ({ navigation, route }) => {
                 style={styles.picker}
                 onValueChange={(itemValue) => setRole(itemValue)}
               >
-                <Picker.Item label="Worker" value="worker" />
-                <Picker.Item label="Supervisor" value="supervisor" />
-                <Picker.Item label="Manager" value="manager" />
+                <Picker.Item label="tech" value="tech" />
+                <Picker.Item label="operator" value="operator" />
                 <Picker.Item label="Admin" value="admin" />
               </Picker>
             </View>
@@ -204,8 +276,12 @@ const AdminScreen = ({ navigation, route }) => {
                 onValueChange={(itemValue) => setSelectedBloc(itemValue)}
               >
                 <Picker.Item label="Select a bloc" value="" />
-                {blocs.map((bloc, index) => (
-                  <Picker.Item key={index} label={bloc.name} value={bloc.name} />
+                {blocs && blocs.map((bloc) => (
+                  <Picker.Item 
+                    key={bloc.id} 
+                    label={bloc.name} 
+                    value={bloc.id} // Use bloc ID instead of name
+                  />
                 ))}
               </Picker>
             </View>

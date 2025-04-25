@@ -30,13 +30,15 @@ public class AnomalieController {
         return ResponseEntity.ok(anomalieService.assignToTechnician(anomalieId, technicien));
     }
 
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    
+    @PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Anomalie> createAnomalie(
             @RequestParam("title") String title,
             @RequestParam("description") String description,
-            @RequestParam("photo") MultipartFile photo) {
+            @RequestParam("photo") MultipartFile photo,
+            @RequestParam("machineId") Long machineId) {
         
-        Anomalie newAnomalie = anomalieService.createAnomalie(title, description, photo);
+        Anomalie newAnomalie = anomalieService.createAnomalie(title, description, photo, machineId);
         return ResponseEntity.ok(newAnomalie);
     }
 }
